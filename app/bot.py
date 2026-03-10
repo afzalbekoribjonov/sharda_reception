@@ -43,16 +43,25 @@ def build_bot() -> Bot:
 def build_dispatcher(
     admins_repo: AdminsRepo,
     users_repo: UsersRepo,
+    candidates_repo: CandidatesRepo,
     translations: dict,
 ) -> Dispatcher:
     dp = Dispatcher()
 
+    # Handlerlarga dependency uzatish
+    dp["users_repo"] = users_repo
+    dp["candidates_repo"] = candidates_repo
+    dp["admins_repo"] = admins_repo
+    dp["translations"] = translations
+
+    # Middlewares
     dp.message.middleware(RoleMiddleware(admins_repo))
     dp.callback_query.middleware(RoleMiddleware(admins_repo))
 
     dp.message.middleware(I18nMiddleware(users_repo, translations))
     dp.callback_query.middleware(I18nMiddleware(users_repo, translations))
 
+    # Routers
     dp.include_router(registration_router)
     dp.include_router(start_router)
     dp.include_router(user_router)
@@ -61,20 +70,31 @@ def build_dispatcher(
     return dp
 
 
-@web.middleware
-async def log_requests(request: web.Request, handler):
-    logging.info("HTTP %s %s", request.method, request.path)
-    try:
-        response = await handler(request)
-        logging.info("HTTP %s %s -> %s", request.method, request.path, response.status)
-        return response
-    except Exception:
-        logging.exception("Request failed: %s %s", request.method, request.path)
-        raise
-
-
 async def healthcheck(_: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
+
+
+async def safe_reminder_loop(app: web.Application) -> None:
+    bot: Bot = app["bot"]
+    candidates_repo: CandidatesRepo = app["candidates_repo"]
+    users_repo: UsersRepo = app["users_repo"]
+    translations: dict = app["translations"]
+
+    while True:
+        try:
+            await reminder_loop(
+                bot=bot,
+                candidates_repo=candidates_repo,
+                users_repo=users_repo,
+                translations=translations,
+                tz_name=settings.TZ,
+                interval_seconds=60,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logging.exception("Reminder loop crashed. Restarting in 5 seconds...")
+            await asyncio.sleep(5)
 
 
 async def on_startup(app: web.Application) -> None:
@@ -82,32 +102,20 @@ async def on_startup(app: web.Application) -> None:
 
     bot: Bot = app["bot"]
     admins_repo: AdminsRepo = app["admins_repo"]
-    users_repo: UsersRepo = app["users_repo"]
-    candidates_repo: CandidatesRepo = app["candidates_repo"]
-    translations: dict = app["translations"]
 
     await admins_repo.ensure_super_admin(settings.SUPER_ADMIN_TG_ID)
 
-    reminder_task = asyncio.create_task(
-        reminder_loop(
-            bot=bot,
-            candidates_repo=candidates_repo,
-            users_repo=users_repo,
-            translations=translations,
-            tz_name=settings.TZ,
-            interval_seconds=60,
-        )
-    )
-    app["reminder_task"] = reminder_task
-
     webhook_url = f"{settings.WEBHOOK_BASE_URL.rstrip('/')}{app['webhook_path']}"
+
     await bot.set_webhook(
         url=webhook_url,
         drop_pending_updates=True,
         allowed_updates=["message", "callback_query"],
     )
 
-    logging.info("Webhook set: %s", webhook_url)
+    app["reminder_task"] = asyncio.create_task(safe_reminder_loop(app))
+
+    logging.info("Webhook set successfully.")
 
 
 async def on_shutdown(app: web.Application) -> None:
@@ -141,16 +149,11 @@ def create_app() -> web.Application:
     dp = build_dispatcher(
         admins_repo=admins_repo,
         users_repo=users_repo,
+        candidates_repo=candidates_repo,
         translations=translations,
     )
 
-    # Handlerlarga dependency inject bo‘lishi uchun
-    dp["users_repo"] = users_repo
-    dp["candidates_repo"] = candidates_repo
-    dp["admins_repo"] = admins_repo
-    dp["translations"] = translations
-
-    app = web.Application(middlewares=[log_requests])
+    app = web.Application()
 
     app.router.add_get("/", healthcheck)
     app.router.add_get("/health", healthcheck)
@@ -164,7 +167,7 @@ def create_app() -> web.Application:
     app["admins_repo"] = admins_repo
     app["translations"] = translations
     app["webhook_path"] = webhook_path
-    # app["reminder_task"] = None
+    app["reminder_task"] = None
 
     SimpleRequestHandler(
         dispatcher=dp,
@@ -186,7 +189,7 @@ if __name__ == "__main__":
     )
 
     port = int(os.getenv("PORT", "10000"))
-    logging.info("Starting aiohttp on 0.0.0.0:%s", port)
+    logging.info("Starting server on 0.0.0.0:%s", port)
 
     web.run_app(
         create_app(),
