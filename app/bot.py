@@ -164,7 +164,7 @@ def create_app() -> web.Application:
     app["admins_repo"] = admins_repo
     app["translations"] = translations
     app["webhook_path"] = webhook_path
-    app["reminder_task"] = None
+    # app["reminder_task"] = None
 
     SimpleRequestHandler(
         dispatcher=dp,
