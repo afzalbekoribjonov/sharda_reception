@@ -1,0 +1,207 @@
+:root{
+  --bg: #0b1220;
+  --card:#0f1a2e;
+  --text:#e9eefc;
+  --muted:#a7b2d6;
+  --border: rgba(255,255,255,.10);
+  --shadow: 0 20px 60px rgba(0,0,0,.35);
+  --primary:#4ea1ff;
+  --primary2:#7c5cff;
+  --danger:#ff5b6a;
+  --ok:#2ecc71;
+  --radius: 20px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+  background: radial-gradient(1200px 800px at 20% 10%, rgba(124,92,255,.25), transparent 55%),
+              radial-gradient(900px 700px at 85% 30%, rgba(78,161,255,.22), transparent 55%),
+              linear-gradient(180deg, var(--bg), #060a14 65%);
+  color: var(--text);
+}
+
+.wrap{
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 18px 14px 28px;
+}
+
+.top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding: 10px 4px 16px;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.logo{
+  width:44px;height:44px;
+  display:grid;place-items:center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(78,161,255,.95), rgba(124,92,255,.95));
+  box-shadow: 0 10px 30px rgba(78,161,255,.20);
+  font-weight: 800;
+}
+
+.title{font-size: 18px; font-weight: 800; letter-spacing:.2px}
+.subtitle{font-size: 13px; color: var(--muted); margin-top:2px}
+
+.pill{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 16px 16px;
+  backdrop-filter: blur(10px);
+}
+
+.hint{
+  border: 1px dashed rgba(255,255,255,.16);
+  background: rgba(255,255,255,.04);
+  border-radius: 16px;
+  padding: 12px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.field{margin: 12px 0 14px}
+label{display:block; font-size: 13px; font-weight: 700; margin-bottom:8px}
+
+.inputWrap{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.18);
+  border-radius: 16px;
+  padding: 12px 12px;
+}
+
+.prefix{
+  font-weight: 800;
+  color: rgba(233,238,252,.85);
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+  user-select:none;
+}
+
+input{
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+}
+
+input::placeholder{color: rgba(167,178,214,.70)}
+
+.muted{
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.err{
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 8px;
+  min-height: 16px;
+}
+
+.btn{
+  width:100%;
+  border:0;
+  border-radius: 16px;
+  padding: 13px 14px;
+  font-weight: 900;
+  font-size: 15px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin-top: 10px;
+  color: #071025;
+  background: linear-gradient(135deg, var(--primary), var(--primary2));
+  box-shadow: 0 14px 40px rgba(78,161,255,.20);
+}
+
+.btn:active{transform: translateY(1px)}
+
+.btn.ghost{
+  margin-top: 10px;
+  color: var(--text);
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.spinner{
+  width:16px;height:16px;
+  border-radius:50%;
+  border: 2px solid rgba(7,16,37,.25);
+  border-top-color: rgba(7,16,37,.95);
+  display:none;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to{ transform: rotate(360deg); } }
+
+.footer{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  color: rgba(167,178,214,.90);
+  font-size: 12px;
+}
+
+.toast{
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 16px;
+  background: rgba(10,16,30,.92);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--text);
+  box-shadow: 0 18px 60px rgba(0,0,0,.40);
+  max-width: min(520px, calc(100% - 24px));
+  width: max-content;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+}
+
+.toast.show{opacity: 1}
+
+@media (max-width: 380px){
+  .logo{width:40px;height:40px}
+  .title{font-size: 17px}
+}

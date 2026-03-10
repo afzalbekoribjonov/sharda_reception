@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sharda University Uzbekistan</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">S</div>
+        <div>
+          <div class="title" id="t_title">Ro‘yxatdan o‘tish</div>
+          <div class="subtitle" id="t_subtitle">Ma’lumotlarni kiriting</div>
+        </div>
+      </div>
+      <button class="pill" id="langBtn" type="button" title="Language">UZ</button>
+    </header>
+
+    <main class="card">
+      <div class="hint" id="t_hint">
+        Bu ma’lumotlar ro‘yxatdan o‘tishni davom ettirish uchun kerak bo‘ladi.
+      </div>
+
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="fullName" id="t_name_label">Ism familiya</label>
+          <div class="inputWrap">
+            <input id="fullName" name="fullName" type="text" autocomplete="name"
+                   placeholder="Masalan: Afzalbek Orifjonov" />
+          </div>
+          <div class="err" id="errName"></div>
+        </div>
+
+        <div class="field">
+          <label for="phone" id="t_phone_label">Telefon raqam</label>
+          <div class="inputWrap">
+            <span class="prefix">+998</span>
+            <input id="phone" name="phone" inputmode="numeric" autocomplete="tel"
+                   placeholder="90 123 45 67" />
+          </div>
+          <div class="muted" id="t_phone_help">Raqamni 9 xonada kiriting (90 123 45 67)</div>
+          <div class="err" id="errPhone"></div>
+        </div>
+
+        <button class="btn" id="submitBtn" type="submit">
+          <span id="t_submit">Yuborish</span>
+          <span class="spinner" id="spinner" aria-hidden="true"></span>
+        </button>
+
+        <button class="btn ghost" id="closeBtn" type="button">
+          <span id="t_close">Yopish</span>
+        </button>
+
+        <div class="footer">
+          <div class="lock" aria-hidden="true">🔒</div>
+          <div class="footText" id="t_footer">
+            Ma’lumotlar faqat ro‘yxatdan o‘tish uchun ishlatiladi.
+          </div>
+        </div>
+      </form>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
