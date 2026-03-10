@@ -144,6 +144,12 @@ def create_app() -> web.Application:
         translations=translations,
     )
 
+    # Handlerlarga dependency inject bo‘lishi uchun
+    dp["users_repo"] = users_repo
+    dp["candidates_repo"] = candidates_repo
+    dp["admins_repo"] = admins_repo
+    dp["translations"] = translations
+
     app = web.Application(middlewares=[log_requests])
 
     app.router.add_get("/", healthcheck)
@@ -165,15 +171,7 @@ def create_app() -> web.Application:
         bot=bot,
     ).register(app, path=webhook_path)
 
-    setup_application(
-        app,
-        dp,
-        bot=bot,
-        users_repo=users_repo,
-        candidates_repo=candidates_repo,
-        admins_repo=admins_repo,
-        translations=translations,
-    )
+    setup_application(app, dp)
 
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
