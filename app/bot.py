@@ -28,6 +28,18 @@ from app.routers.user import router as user_router
 from app.scheduler.scheduler import reminder_loop
 
 
+def build_bot() -> Bot:
+    session = AiohttpSession(timeout=60)
+    session._connector_init["family"] = socket.AF_INET
+    session._connector_init["ttl_dns_cache"] = 300
+
+    return Bot(
+        token=settings.BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+        session=session,
+    )
+
+
 def build_dispatcher(
     admins_repo: AdminsRepo,
     users_repo: UsersRepo,
@@ -49,24 +61,56 @@ def build_dispatcher(
     return dp
 
 
-def build_bot() -> Bot:
-    session = AiohttpSession(timeout=60)
-    session._connector_init["family"] = socket.AF_INET
-    session._connector_init["ttl_dns_cache"] = 300
-
-    return Bot(
-        token=settings.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-        session=session,
-    )
-
-
 async def healthcheck(_: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
 
 
 async def on_startup(app: web.Application) -> None:
-    logging.warning("Starting application...")
+    logging.warning("Application startup...")
+
+    bot: Bot = app["bot"]
+    reminder_task = asyncio.create_task(
+        reminder_loop(
+            bot=bot,
+            candidates_repo=app["candidates_repo"],
+            users_repo=app["users_repo"],
+            translations=app["translations"],
+            tz_name=settings.TZ,
+            interval_seconds=60,
+        )
+    )
+    app["reminder_task"] = reminder_task
+
+    webhook_path = app["webhook_path"]
+    webhook_url = f"{settings.WEBHOOK_BASE_URL.rstrip('/')}{webhook_path}"
+
+    await bot.set_webhook(
+        url=webhook_url,
+        drop_pending_updates=True,
+    )
+
+    logging.warning("Webhook set to: %s", webhook_url)
+
+
+async def on_shutdown(app: web.Application) -> None:
+    logging.warning("Application shutdown...")
+
+    reminder_task = app.get("reminder_task")
+    if reminder_task:
+        reminder_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await reminder_task
+
+    bot: Bot = app["bot"]
+    with contextlib.suppress(Exception):
+        await bot.delete_webhook()
+    await bot.session.close()
+
+    mongo.close()
+
+
+def create_app() -> web.Application:
+    logging.warning("Creating application...")
 
     mongo.connect()
     db = mongo.db
@@ -74,8 +118,6 @@ async def on_startup(app: web.Application) -> None:
     users_repo = UsersRepo(db)
     candidates_repo = CandidatesRepo(db)
     admins_repo = AdminsRepo(db)
-
-    await admins_repo.ensure_super_admin(settings.SUPER_ADMIN_TG_ID)
 
     translations = load_translations()
 
@@ -86,42 +128,23 @@ async def on_startup(app: web.Application) -> None:
         translations=translations,
     )
 
+    app = web.Application()
+    app.router.add_get("/", healthcheck)
+    app.router.add_get("/health", healthcheck)
+
+    webhook_path = f"/webhook/{settings.WEBHOOK_SECRET}"
+
     app["bot"] = bot
     app["dp"] = dp
     app["users_repo"] = users_repo
     app["candidates_repo"] = candidates_repo
     app["admins_repo"] = admins_repo
     app["translations"] = translations
-
-    reminder_task = asyncio.create_task(
-        reminder_loop(
-            bot=bot,
-            candidates_repo=candidates_repo,
-            users_repo=users_repo,
-            translations=translations,
-            tz_name=settings.TZ,
-            interval_seconds=60,
-        )
-    )
-    app["reminder_task"] = reminder_task
-
-    webhook_base = os.getenv("WEBHOOK_BASE_URL", "").rstrip("/")
-    webhook_secret = os.getenv("WEBHOOK_SECRET", settings.BOT_TOKEN)
-    webhook_path = f"/webhook/{webhook_secret}"
-    webhook_url = f"{webhook_base}{webhook_path}"
-
     app["webhook_path"] = webhook_path
-    app["webhook_secret"] = webhook_secret
-
-    await bot.set_webhook(
-        url=webhook_url,
-        drop_pending_updates=True,
-    )
 
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
-        secret_token=None,
     ).register(app, path=webhook_path)
 
     setup_application(
@@ -134,42 +157,31 @@ async def on_startup(app: web.Application) -> None:
         translations=translations,
     )
 
-    logging.warning("Webhook set: %s", webhook_url)
-
-
-async def on_shutdown(app: web.Application) -> None:
-    logging.warning("Shutting down application...")
-
-    reminder_task = app.get("reminder_task")
-    if reminder_task:
-        reminder_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await reminder_task
-
-    bot: Bot | None = app.get("bot")
-    if bot:
-        with contextlib.suppress(Exception):
-            await bot.delete_webhook()
-        await bot.session.close()
-
-    mongo.close()
-
-
-def create_app() -> web.Application:
-    app = web.Application()
-
-    app.router.add_get("/", healthcheck)
-    app.router.add_get("/health", healthcheck)
-
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
 
     return app
 
 
+async def ensure_super_admin(app: web.Application) -> None:
+    admins_repo: AdminsRepo = app["admins_repo"]
+    await admins_repo.ensure_super_admin(settings.SUPER_ADMIN_TG_ID)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.WARNING)
 
     app = create_app()
+
+    async def startup_wrapper(app_: web.Application) -> None:
+        await ensure_super_admin(app_)
+        await on_startup(app_)
+
+    app.on_startup.clear()
+    app.on_startup.append(startup_wrapper)
+    app.on_shutdown.append(on_shutdown)
+
     port = int(os.getenv("PORT", "10000"))
+    logging.warning("Starting aiohttp on 0.0.0.0:%s", port)
+
     web.run_app(app, host="0.0.0.0", port=port)

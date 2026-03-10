@@ -4,7 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     BOT_TOKEN: str
     MONGO_URI: str
@@ -14,6 +18,9 @@ class Settings(BaseSettings):
 
     TZ: str = "Asia/Tashkent"
     INTRO_PHOTO_FILE_ID: str | None = None
+
+    WEBHOOK_BASE_URL: str
+    WEBHOOK_SECRET: str
 
 
 settings = Settings()
