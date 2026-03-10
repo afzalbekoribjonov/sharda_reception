@@ -61,39 +61,57 @@ def build_dispatcher(
     return dp
 
 
+@web.middleware
+async def log_requests(request: web.Request, handler):
+    logging.info("HTTP %s %s", request.method, request.path)
+    try:
+        response = await handler(request)
+        logging.info("HTTP %s %s -> %s", request.method, request.path, response.status)
+        return response
+    except Exception:
+        logging.exception("Request failed: %s %s", request.method, request.path)
+        raise
+
+
 async def healthcheck(_: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
 
 
 async def on_startup(app: web.Application) -> None:
-    logging.warning("Application startup...")
+    logging.info("Application startup...")
 
     bot: Bot = app["bot"]
+    admins_repo: AdminsRepo = app["admins_repo"]
+    users_repo: UsersRepo = app["users_repo"]
+    candidates_repo: CandidatesRepo = app["candidates_repo"]
+    translations: dict = app["translations"]
+
+    await admins_repo.ensure_super_admin(settings.SUPER_ADMIN_TG_ID)
+
     reminder_task = asyncio.create_task(
         reminder_loop(
             bot=bot,
-            candidates_repo=app["candidates_repo"],
-            users_repo=app["users_repo"],
-            translations=app["translations"],
+            candidates_repo=candidates_repo,
+            users_repo=users_repo,
+            translations=translations,
             tz_name=settings.TZ,
             interval_seconds=60,
         )
     )
     app["reminder_task"] = reminder_task
 
-    webhook_path = app["webhook_path"]
-    webhook_url = f"{settings.WEBHOOK_BASE_URL.rstrip('/')}{webhook_path}"
-
+    webhook_url = f"{settings.WEBHOOK_BASE_URL.rstrip('/')}{app['webhook_path']}"
     await bot.set_webhook(
         url=webhook_url,
         drop_pending_updates=True,
+        allowed_updates=["message", "callback_query"],
     )
 
-    logging.warning("Webhook set to: %s", webhook_url)
+    logging.info("Webhook set: %s", webhook_url)
 
 
 async def on_shutdown(app: web.Application) -> None:
-    logging.warning("Application shutdown...")
+    logging.info("Application shutdown...")
 
     reminder_task = app.get("reminder_task")
     if reminder_task:
@@ -102,23 +120,21 @@ async def on_shutdown(app: web.Application) -> None:
             await reminder_task
 
     bot: Bot = app["bot"]
+
     with contextlib.suppress(Exception):
         await bot.delete_webhook()
-    await bot.session.close()
 
+    await bot.session.close()
     mongo.close()
 
 
 def create_app() -> web.Application:
-    logging.warning("Creating application...")
-
     mongo.connect()
     db = mongo.db
 
     users_repo = UsersRepo(db)
     candidates_repo = CandidatesRepo(db)
     admins_repo = AdminsRepo(db)
-
     translations = load_translations()
 
     bot = build_bot()
@@ -128,7 +144,8 @@ def create_app() -> web.Application:
         translations=translations,
     )
 
-    app = web.Application()
+    app = web.Application(middlewares=[log_requests])
+
     app.router.add_get("/", healthcheck)
     app.router.add_get("/health", healthcheck)
 
@@ -141,6 +158,7 @@ def create_app() -> web.Application:
     app["admins_repo"] = admins_repo
     app["translations"] = translations
     app["webhook_path"] = webhook_path
+    app["reminder_task"] = None
 
     SimpleRequestHandler(
         dispatcher=dp,
@@ -163,25 +181,17 @@ def create_app() -> web.Application:
     return app
 
 
-async def ensure_super_admin(app: web.Application) -> None:
-    admins_repo: AdminsRepo = app["admins_repo"]
-    await admins_repo.ensure_super_admin(settings.SUPER_ADMIN_TG_ID)
-
-
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING)
-
-    app = create_app()
-
-    async def startup_wrapper(app_: web.Application) -> None:
-        await ensure_super_admin(app_)
-        await on_startup(app_)
-
-    app.on_startup.clear()
-    app.on_startup.append(startup_wrapper)
-    app.on_shutdown.append(on_shutdown)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+    )
 
     port = int(os.getenv("PORT", "10000"))
-    logging.warning("Starting aiohttp on 0.0.0.0:%s", port)
+    logging.info("Starting aiohttp on 0.0.0.0:%s", port)
 
-    web.run_app(app, host="0.0.0.0", port=port)
+    web.run_app(
+        create_app(),
+        host="0.0.0.0",
+        port=port,
+    )
