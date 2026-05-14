@@ -22,5 +22,7 @@ class Settings(BaseSettings):
     WEBHOOK_BASE_URL: str
     WEBHOOK_SECRET: str
 
+    GEMINI_API_KEY: str | None = None
+
 
 settings = Settings()

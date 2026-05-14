@@ -9,11 +9,13 @@ def admin_menu_keyboard(t: dict[str, str], is_super_admin: bool) -> InlineKeyboa
 
     b.add(
         InlineKeyboardButton(text=t["btn_admin_users"], callback_data="adm:USERS"),
+        InlineKeyboardButton(text=t["btn_admin_bulk_edit"], callback_data="adm:BULK_EDIT"),
         InlineKeyboardButton(text=t["btn_admin_pending"], callback_data="adm:PENDING"),
         InlineKeyboardButton(text=t["btn_admin_export"], callback_data="adm:EXPORT"),
         InlineKeyboardButton(text=t["btn_admin_stats"], callback_data="adm:STATS"),
         InlineKeyboardButton(text=t["btn_admin_msg_one"], callback_data="adm:MSGONE"),
         InlineKeyboardButton(text=t["btn_admin_broadcast"], callback_data="adm:BCAST"),
+        InlineKeyboardButton(text=t["btn_admin_exam_configs"], callback_data="adm:EXAM_CONFIGS"),
     )
 
     if is_super_admin:

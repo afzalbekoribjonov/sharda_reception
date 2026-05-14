@@ -25,6 +25,19 @@ class AdminBcast(StatesGroup):
     confirm = State()
 
 
+class AdminBulkEdit(StatesGroup):
+    waiting_value = State()
+
+
+@dataclass
+class BulkEditCtx:
+    field: str
+    fac: str
+    ex: str
+    origin_chat_id: int
+    origin_message_id: int
+
+
 @dataclass
 class EditCtx:
     field: str

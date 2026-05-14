@@ -297,12 +297,55 @@ pipenv run mypy app
 
 ---
 
+## Render orqali ishga tushirish (Blueprint)
+
+Loyiha Render platformasida bot va WebApp’ni bitta servisda ishga tushirishga moslashtirilgan.
+
+### 1. Blueprint (render.yaml)
+Loyiha root qismida `render.yaml` fayli mavjud. Render dashboard’da **Blueprints** bo‘limiga kiring va loyihangizni bog‘lang.
+
+### 2. Environment Variables
+Render’da quyidagi o‘zgaruvchilarni set qiling:
+- `BOT_TOKEN`
+- `MONGO_URI` (MongoDB Atlas tavsiya etiladi)
+- `SUPER_ADMIN_TG_ID`
+- `WEBHOOK_BASE_URL` (masalan: `https://sharda-bot.onrender.com`)
+- `WEBAPP_URL` (`https://sharda-bot.onrender.com/webapp/index.html` ko‘rinishida bo‘ladi)
+
+---
+
+## Docker orqali ishga tushirish (Lokal/VPS)
+
+Loyiha Docker va Docker Compose orqali barcha kerakli komponentlar (Bot, MongoDB, Nginx) bilan birga ishga tushiriladi.
+
+### 1. Tayyorgarlik
+`.env` faylini yarating va kerakli o'zgaruvchilarni kiriting:
+```env
+BOT_TOKEN=your_bot_token
+MONGO_URI=mongodb://db:27017
+MONGO_DB=suuz_bot
+SUPER_ADMIN_TG_ID=your_id
+WEBAPP_URL=http://your_domain_or_ip/webapp/index.html
+WEBHOOK_BASE_URL=http://your_domain_or_ip
+WEBHOOK_SECRET=some_random_secret_string
+```
+
+### 2. Ishga tushirish
+```bash
+docker-compose up -d --build
+```
+
+### 3. Komponentlar:
+- **sharda_app**: Bot va API (Aiohttp server)
+- **sharda_db**: MongoDB ma'lumotlar bazasi
+- **sharda_nginx**: WebApp statik fayllarini serve qiladi va bot webhooklarini proxy qiladi
+
+---
+
 ## Keyingi bosqichlar (serverga tayyorlash)
-README’dan keyin odatda quyidagilarni “production-ready” qilamiz:
-- Dockerfile + docker-compose (bot + nginx webapp + optional mongo)
-- webhook rejimiga o‘tish (xohlasangiz) + HTTPS reverse proxy
-- monitoring/logging (journald, logrotate)
-- secrets management (dotenv emas, systemd env / vault)
-- backup va eksportlar uchun doimiy storage
+Ushbu Docker konfiguratsiyasi production’ga deyarli tayyor. HTTPS qo'shish uchun:
+1. Nginx’da SSL sertifikatlarini (Certbot/Let's Encrypt) sozlang.
+2. `WEBAPP_URL` va `WEBHOOK_BASE_URL` larni `https://` bilan boshlanadigan qiling.
+3. BotFather orqali domenni whitelist qiling.
 
 ---

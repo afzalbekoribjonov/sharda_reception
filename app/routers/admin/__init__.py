@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from aiogram import Router
 
-from . import admins, broadcast, cancel, edit, export, menu, messaging, pending, users
+from . import admins, broadcast, bulk_edit, cancel, edit, export, menu, messaging, pending, users
 
 router = Router()
 router.include_router(menu.router)
+router.include_router(bulk_edit.router)
 router.include_router(users.router)
 router.include_router(pending.router)
 router.include_router(edit.router)

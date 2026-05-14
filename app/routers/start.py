@@ -32,7 +32,7 @@ async def cmd_start(
         return
 
     # registered emas -> til tanlash (birinchi bosqich)
-    await message.answer(t["choose_lang"], reply_markup=lang_keyboard(t))
+    await message.answer(t["choose_lang"], reply_markup=lang_keyboard(t, back_cb="langback:START"))
 
 
 @router.callback_query(F.data.startswith("setlang:"))
@@ -74,3 +74,9 @@ async def on_lang_back(callback: CallbackQuery, t: dict[str, str]) -> None:
     # Startdagi til tanlashdan "back" bosilsa introga qaytaramiz
     await callback.answer()
     await safe_edit_text(callback.message, t["intro_caption"], reply_markup=None)
+
+
+@router.message(F.text.in_({"⬅️ Orqaga", "⬅️ Назад", "⬅️ Back"}))
+async def on_back_text(message: Message, t: dict[str, str]) -> None:
+    # WebApp bosqichidan orqaga qaytish (til tanlashga)
+    await message.answer(t["choose_lang"], reply_markup=lang_keyboard(t))

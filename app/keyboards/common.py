@@ -44,7 +44,8 @@ def open_webapp_reply_keyboard(t: dict[str, str], url: str, lang: str | None = N
         KeyboardButton(
             text=t["btn_open_webapp"],
             web_app=WebAppInfo(url=webapp_url),
-        )
+        ),
+        KeyboardButton(text=t["btn_back"]),
     )
     b.adjust(1)
-    return b.as_markup(resize_keyboard=True, one_time_keyboard=True)
+    return b.as_markup(resize_keyboard=True)

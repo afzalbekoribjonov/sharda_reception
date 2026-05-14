@@ -1,19 +1,29 @@
 from __future__ import annotations
-
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from app.config import settings
 
 
 def main_menu_keyboard(t: dict[str, str]) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
+
     b.add(
-        InlineKeyboardButton(text=t["btn_menu_profile"], callback_data="menu:PROFILE"),
-        InlineKeyboardButton(text=t["btn_menu_exam"], callback_data="menu:EXAM"),
-        InlineKeyboardButton(text=t["btn_menu_settings"], callback_data="menu:SETTINGS"),
-        InlineKeyboardButton(text=t["btn_menu_sharda"], callback_data="menu:SHARDA"),
+        InlineKeyboardButton(text=t["btn_menu_profile"], callback_data="m:profile"),
+        InlineKeyboardButton(text=t["btn_menu_exam"], callback_data="m:exam"),
+        InlineKeyboardButton(text=t["btn_menu_sharda"], callback_data="m:sharda"),
+    )
+
+    # AI Chat button
+    if settings.WEBAPP_URL:
+        ai_url = settings.WEBAPP_URL.replace("index.html", "ai_chat.html")
+        b.add(InlineKeyboardButton(text=t["btn_menu_ai_chat"], web_app=WebAppInfo(url=ai_url)))
+
+    b.add(
+        InlineKeyboardButton(text=t["btn_menu_settings"], callback_data="m:settings"),
     )
     b.adjust(2)
     return b.as_markup()
+
 
 
 def profile_keyboard(t: dict[str, str]) -> InlineKeyboardMarkup:

@@ -5,8 +5,10 @@ import json
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 
+from app.config import settings
 from app.db.repos.candidates_repo import CandidatesRepo
 from app.db.repos.users_repo import UsersRepo
+from app.keyboards.common import open_webapp_reply_keyboard
 from app.keyboards.faculty import faculty_keyboard, btech_tracks_keyboard
 from app.keyboards.exam_type import exam_type_keyboard
 from app.keyboards.menu import main_menu_keyboard
@@ -100,8 +102,18 @@ async def on_webapp_data(
 
 
 @router.callback_query(F.data.startswith("faculty:"))
-async def on_faculty(callback: CallbackQuery, candidates_repo: CandidatesRepo, t: dict[str, str]) -> None:
+async def on_faculty(callback: CallbackQuery, candidates_repo: CandidatesRepo, t: dict[str, str], lang: str) -> None:
     faculty = callback.data.split(":", 1)[1]
+
+    if faculty == "BACK":
+        await callback.answer()
+        if settings.WEBAPP_URL:
+            await callback.message.delete()
+            await callback.message.answer(
+                t["btn_open_webapp"],
+                reply_markup=open_webapp_reply_keyboard(t, settings.WEBAPP_URL, lang=lang),
+            )
+        return
 
     if faculty not in {"BBA", "BSC", "BAAE", "BTECH"}:
         await callback.answer("Invalid", show_alert=True)
@@ -135,9 +147,22 @@ async def on_btech_track(callback: CallbackQuery, candidates_repo: CandidatesRep
     await safe_edit_text(callback.message, t["choose_exam_type"], reply_markup=exam_type_keyboard(t))
 
 
-@router.callback_query(F.data.in_({"exam:ONLINE", "exam:OFFLINE"}))
+@router.callback_query(F.data.startswith("exam:"))
 async def on_exam_type(callback: CallbackQuery, candidates_repo: CandidatesRepo, t: dict[str, str]) -> None:
     exam_type = callback.data.split(":", 1)[1]
+
+    if exam_type == "BACK":
+        await callback.answer()
+        doc = await candidates_repo.get_progress(callback.from_user.id)
+        faculty = (doc or {}).get("faculty")
+        if faculty == "BTECH":
+            await safe_edit_text(callback.message, t["choose_btech_track"], reply_markup=btech_tracks_keyboard(t))
+        else:
+            await safe_edit_text(callback.message, t["choose_faculty"], reply_markup=faculty_keyboard(t))
+        return
+
+    if exam_type not in {"ONLINE", "OFFLINE"}:
+        return
 
     await candidates_repo.set_exam_type(callback.from_user.id, exam_type)
     await callback.answer("✅")

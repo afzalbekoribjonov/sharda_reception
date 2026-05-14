@@ -29,6 +29,10 @@ def filters_text(t: dict[str, str], fac: str, ex: str, st: str) -> str:
     return t["admin_filters_title"].format(faculty=label_fac(fac), exam_type=label_ex(ex), status=label_st(st))
 
 
+def bulk_filters_text(t: dict[str, str], fac: str, ex: str) -> str:
+    return t["bulk_edit_filters_title"].format(faculty=label_fac(fac), exam_type=label_ex(ex))
+
+
 def export_text(t: dict[str, str], fac: str, ex: str, st: str, creds: str) -> str:
     creds_label = "ON" if creds == "1" else "OFF"
     return t["export_filters_title"].format(

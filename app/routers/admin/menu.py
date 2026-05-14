@@ -8,6 +8,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.db.repos.admins_repo import AdminsRepo
 from app.db.repos.candidates_repo import CandidatesRepo
+from app.db.repos.exam_configs_repo import ExamConfigsRepo
 from app.keyboards.admin import (
     admin_filters_keyboard,
     admin_menu_keyboard,
@@ -15,6 +16,7 @@ from app.keyboards.admin import (
     admins_list_keyboard,
     export_filters_keyboard,
     msg_targets_keyboard,
+    admin_exam_configs_keyboard,
 )
 from app.routers.admin._common import cancel_kb, export_text, filters_text
 from app.routers.admin._state import AdminAdd, AdminBcast, AdminMsg
@@ -143,4 +145,13 @@ async def admin_menu_actions(
         await state.clear()
         await state.set_state(AdminBcast.waiting_post)
         await safe_edit_text(callback.message, t["bcast_prompt"], reply_markup=cancel_kb(t))
+        return
+
+    if action == "EXAM_CONFIGS":
+        await callback.answer()
+        await safe_edit_text(
+            callback.message,
+            t["admin_exam_configs_title"],
+            reply_markup=admin_exam_configs_keyboard(t),
+        )
         return

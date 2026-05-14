@@ -11,6 +11,7 @@ def faculty_keyboard(t: dict[str, str]) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=t["faculty_bsc"], callback_data="faculty:BSC"),
         InlineKeyboardButton(text=t["faculty_baae"], callback_data="faculty:BAAE"),
         InlineKeyboardButton(text=t["faculty_btech"], callback_data="faculty:BTECH"),
+        InlineKeyboardButton(text=t["btn_back"], callback_data="faculty:BACK"),
     )
     b.adjust(1)
     return b.as_markup()

@@ -9,6 +9,7 @@ def exam_type_keyboard(t: dict[str, str]) -> InlineKeyboardMarkup:
     b.add(
         InlineKeyboardButton(text=t["btn_exam_online"], callback_data="exam:ONLINE"),
         InlineKeyboardButton(text=t["btn_exam_offline"], callback_data="exam:OFFLINE"),
+        InlineKeyboardButton(text=t["btn_back"], callback_data="exam:BACK"),
     )
-    b.adjust(2)
+    b.adjust(2, 1)
     return b.as_markup()

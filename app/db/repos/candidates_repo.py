@@ -299,6 +299,35 @@ class CandidatesRepo:
     async def all_tids(self) -> list[int]:
         return await self.target_tids("ALL")
 
+    async def get_tids_by_filter(self, faculty: str, exam_type: str) -> list[int]:
+        q: dict[str, Any] = {"status": "registered"}
+        if faculty != "A":
+            q["faculty"] = "BTECH" if faculty == "BT" else faculty
+        if exam_type != "A":
+            q["exam_type"] = "ONLINE" if exam_type == "ON" else "OFFLINE"
+        
+        cur = self.col.find(q, {"telegram_id": 1})
+        docs = await cur.to_list(length=100000)
+        return [int(d["telegram_id"]) for d in docs if d.get("telegram_id")]
+
+    async def bulk_update_candidates(self, faculty: str, exam_type: str, set_fields: dict[str, Any], admin_id: int) -> int:
+        q: dict[str, Any] = {"status": "registered"}
+        if faculty != "A":
+            q["faculty"] = "BTECH" if faculty == "BT" else faculty
+        if exam_type != "A":
+            q["exam_type"] = "ONLINE" if exam_type == "ON" else "OFFLINE"
+
+        ts = _now()
+        update = {
+            "$set": {
+                **set_fields,
+                "updated_at": ts,
+                "updated_by_admin_id": admin_id
+            }
+        }
+        res = await self.col.update_many(q, update)
+        return int(res.modified_count)
+
     async def find_by_phone(self, phone: str) -> dict[str, Any] | None:
         digits = re.sub(r"\D+", "", phone or "")
         if len(digits) >= 9:

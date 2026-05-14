@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-EXAM_DT_FORMAT = "%Y-%m-%d %H:%M"
+EXAM_DT_FORMAT = "%d.%m.%Y %H:%M"
 
 
 def parse_exam_datetime(value: str, tz_name: str) -> datetime:
