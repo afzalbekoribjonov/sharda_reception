@@ -13,7 +13,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-import google.genai as genai
+from google.genai import Client
 
 from app.config import settings
 from app.db.mongo import mongo
@@ -103,31 +103,32 @@ async def handle_ai_chat(request: web.Request) -> web.Response:
     )
 
     try:
-        # Configure Google Genai SDK
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            model_name="gemini-3.1-flash-lite",
-            system_instruction=system_instruction
-        )
+        # Initialize Google Genai Async Client
+        client = Client(api_key=settings.GEMINI_API_KEY)
+        async_client = client.aio
         
         # Truncate history to last 6 messages (3 turns) to save tokens and stay within TPM limits
         if len(history) > 6:
             history = history[-6:]
 
-        # Build chat history for the model
-        chat_history = []
-        for h in history:
-            role = "user" if h["role"] == "user" else "model"
-            text = h["parts"][0]["text"]
-            chat_history.append({"role": role, "parts": [{"text": text}]})
+        # Add current user message to history
+        full_history = history + [{"role": "user", "parts": [{"text": user_message}]}]
 
-        # Start chat session with history
-        chat_session = model.start_chat(history=chat_history)
+        # Call Gemini API with chat history using async client
+        async with async_client:
+            response = await async_client.chats.create(
+                model="gemini-3.1-flash-lite",
+                history=full_history,
+                config={
+                    "system_instruction": system_instruction,
+                    "generation_config": {
+                        "max_output_tokens": 500,
+                        "temperature": 0.5,
+                    }
+                }
+            )
         
-        # Send user message and get response
-        response = chat_session.send_message(user_message)
-        ai_text = response.text
-        
+        ai_text = response.text if hasattr(response, 'text') else str(response)
         return web.json_response({"reply": ai_text})
         
     except Exception as e:
