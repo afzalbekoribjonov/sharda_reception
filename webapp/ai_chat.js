@@ -52,6 +52,9 @@
     // Bold: **text** -> <b>text</b>
     escaped = escaped.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
 
+    // Links: [text](url) -> <a href="url" target="_blank">text</a>
+    escaped = escaped.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color: var(--sharda-blue); text-decoration: underline;">$1</a>');
+
     // Bullet points: * item or - item -> • item
     escaped = escaped.replace(/^[\s]*[\*\-][\s]+(.*)$/gm, "• $1");
 
