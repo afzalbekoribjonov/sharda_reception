@@ -72,7 +72,9 @@ def build_dispatcher(
     return dp
 
 
-async def healthcheck(_: web.Request) -> web.Response:
+async def healthcheck(request: web.Request) -> web.Response:
+    if request.method == "HEAD":
+        return web.Response(status=200)
     return web.json_response({"status": "ok"})
 
 
