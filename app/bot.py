@@ -111,14 +111,11 @@ async def handle_ai_chat(request: web.Request) -> web.Response:
         if len(history) > 6:
             history = history[-6:]
 
-        # Add current user message to history
-        full_history = history + [{"role": "user", "parts": [{"text": user_message}]}]
-
-        # Call Gemini API with chat history using async client
+        # Create chat session with history (do NOT await)
         async with async_client:
-            response = await async_client.chats.create(
+            chat = async_client.chats.create(
                 model="gemini-3.1-flash-lite",
-                history=full_history,
+                history=history,
                 config={
                     "system_instruction": system_instruction,
                     "generation_config": {
@@ -127,6 +124,9 @@ async def handle_ai_chat(request: web.Request) -> web.Response:
                     }
                 }
             )
+            
+            # Send user message and get response (AWAIT this)
+            response = await chat.send_message(user_message)
         
         ai_text = response.text if hasattr(response, 'text') else str(response)
         return web.json_response({"reply": ai_text})
