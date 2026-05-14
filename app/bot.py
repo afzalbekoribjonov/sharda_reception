@@ -131,7 +131,7 @@ async def handle_ai_chat(request: web.Request) -> web.Response:
                         history=history,
                         config={
                             "system_instruction": system_instruction,
-                            "max_output_tokens": 500,
+                            "max_output_tokens": 1000,
                             "temperature": 0.5,
                         }
                     )

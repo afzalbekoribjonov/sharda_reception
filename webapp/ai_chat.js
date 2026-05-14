@@ -5,6 +5,8 @@
   const userInput = document.getElementById("userInput");
   const typing = document.getElementById("typing");
   const scrollBtn = document.getElementById("scrollToBottom");
+  const statusText = document.querySelector(".status-indicator span:last-child");
+  const statusDot = document.querySelector(".status-dot");
 
   if (tg) {
     tg.ready();
@@ -15,6 +17,16 @@
 
   function saveHistory() {
     localStorage.setItem("suuz_chat_history", JSON.stringify(history));
+  }
+
+  function setStatus(isTyping) {
+    if (isTyping) {
+      statusText.textContent = "Yozmoqda...";
+      statusDot.style.background = "#00a400";
+    } else {
+      statusText.textContent = "Online";
+      statusDot.style.background = "#00a400";
+    }
   }
 
   // Scroll to bottom logic
@@ -49,11 +61,30 @@
     return escaped;
   }
 
-  function addMessage(role, text) {
+  async function typeWriter(element, text) {
+    const speed = 15; // ms per character
+    let currentText = "";
+    const words = text.split("");
+    
+    for (const char of words) {
+      currentText += char;
+      element.innerHTML = formatMessage(currentText);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      await new Promise(resolve => setTimeout(resolve, speed));
+    }
+  }
+
+  async function addMessage(role, text, animate = false) {
     const bubble = document.createElement("div");
     bubble.className = `bubble ${role}`;
-    bubble.innerHTML = formatMessage(text);
     chatBox.appendChild(bubble);
+    
+    if (animate && role === "agent") {
+      await typeWriter(bubble, text);
+    } else {
+      bubble.innerHTML = formatMessage(text);
+    }
+    
     chatBox.scrollTop = chatBox.scrollHeight;
   }
 
@@ -70,6 +101,7 @@
 
   async function callAI(message) {
     typing.style.display = "flex";
+    setStatus(true);
     chatBox.scrollTop = chatBox.scrollHeight;
 
     const userId = tg?.initDataUnsafe?.user?.id || "web_user";
@@ -89,16 +121,19 @@
       typing.style.display = "none";
 
       if (data.reply) {
-        addMessage("agent", data.reply);
+        await addMessage("agent", data.reply, true);
+        setStatus(false);
         history.push({ role: "model", parts: [{ text: data.reply }] });
         // Keep history manageable
         if (history.length > 20) history = history.slice(-20);
         saveHistory();
       } else {
+        setStatus(false);
         addMessage("agent", "Kechirasiz, xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
       }
     } catch (err) {
       typing.style.display = "none";
+      setStatus(false);
       addMessage("agent", "Server bilan aloqa o'rnatib bo'lmadi.");
       console.error(err);
     }
