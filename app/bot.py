@@ -6,6 +6,7 @@ import logging
 import os
 import socket
 
+import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -18,6 +19,7 @@ from app.db.mongo import mongo
 from app.db.repos.admins_repo import AdminsRepo
 from app.db.repos.candidates_repo import CandidatesRepo
 from app.db.repos.users_repo import UsersRepo
+from app.db.repos.exam_configs_repo import ExamConfigsRepo
 from app.i18n.loader import load_translations
 from app.middlewares.i18n import I18nMiddleware
 from app.middlewares.role import RoleMiddleware
@@ -44,24 +46,23 @@ def build_dispatcher(
     admins_repo: AdminsRepo,
     users_repo: UsersRepo,
     candidates_repo: CandidatesRepo,
+    exam_configs_repo: ExamConfigsRepo,
     translations: dict,
 ) -> Dispatcher:
     dp = Dispatcher()
 
-    # Handlerlarga dependency uzatish
     dp["users_repo"] = users_repo
     dp["candidates_repo"] = candidates_repo
     dp["admins_repo"] = admins_repo
+    dp["exam_configs_repo"] = exam_configs_repo
     dp["translations"] = translations
 
-    # Middlewares
     dp.message.middleware(RoleMiddleware(admins_repo))
     dp.callback_query.middleware(RoleMiddleware(admins_repo))
 
     dp.message.middleware(I18nMiddleware(users_repo, translations))
     dp.callback_query.middleware(I18nMiddleware(users_repo, translations))
 
-    # Routers
     dp.include_router(registration_router)
     dp.include_router(start_router)
     dp.include_router(user_router)
@@ -72,6 +73,124 @@ def build_dispatcher(
 
 async def healthcheck(_: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
+
+
+async def handle_ai_chat(request: web.Request) -> web.Response:
+    if not settings.GEMINI_API_KEY:
+        return web.json_response({"error": "AI not configured"}, status=500)
+
+    try:
+        data = await request.json()
+        user_message = data.get("message")
+        history = data.get("history", [])
+        user_id = data.get("user_id", "unknown")
+    except Exception:
+        return web.json_response({"error": "Invalid request"}, status=400)
+
+    if not user_message:
+        return web.json_response({"error": "Message required"}, status=400)
+
+    # Use cached Knowledge Base
+    kb_content = request.app.get("kb_content", "")
+    
+    system_instruction = (
+        "Siz Sharda University Uzbekistan (SUUZ) ning rasmiy virtual yordamchisi - 'Suuz agent'siz. "
+        "Sizning vazifangiz universitet haqidagi ma'lumotlar bazasi asosida aniq javob berish. "
+        "Suhbatni professional va juda xushmuomala tarzda olib boring. "
+        "Faqat taqdim etilgan ma'lumotlar asosida javob bering. Noma'lum ma'lumotlar uchun rasmiy saytni tavsiya qiling.\n\n"
+        f"MA'LUMOTLAR BAZASI:\n{kb_content}"
+    )
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+    
+    # Truncate history to last 6 messages (3 turns) to save tokens and stay within TPM limits
+    if len(history) > 6:
+        history = history[-6:]
+
+    contents = []
+    for h in history:
+        contents.append({
+            "role": "user" if h["role"] == "user" else "model",
+            "parts": [{"text": h["parts"][0]["text"]}]
+        })
+    contents.append({
+        "role": "user",
+        "parts": [{"text": user_message}]
+    })
+
+    payload = {
+        "contents": contents,
+        "system_instruction": {
+            "parts": [{"text": system_instruction}]
+        },
+        "generationConfig": {
+            "maxOutputTokens": 500,
+            "temperature": 0.5,
+        }
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as resp:
+            if resp.status != 200:
+                err_text = await resp.text()
+                logging.error("Gemini API error (User: %s): %s", user_id, err_text)
+                return web.json_response({"error": "AI error"}, status=500)
+            
+            result = await resp.json()
+            try:
+                ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                return web.json_response({"reply": ai_text})
+            except (KeyError, IndexError):
+                return web.json_response({"error": "Malformed AI response"}, status=500)
+
+
+async def load_kb(app: web.Application) -> None:
+    kb_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "about_suuz.txt")
+    content = ""
+    if os.path.exists(kb_path):
+        try:
+            with open(kb_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            logging.info("Knowledge Base loaded into memory (%d chars)", len(content))
+        except Exception as e:
+            logging.error("Error loading Knowledge Base: %s", e)
+    app["kb_content"] = content
+    
+    contents = []
+    for h in history:
+        contents.append({
+            "role": "user" if h["role"] == "user" else "model",
+            "parts": [{"text": h["parts"][0]["text"]}]
+        })
+    contents.append({
+        "role": "user",
+        "parts": [{"text": user_message}]
+    })
+
+    payload = {
+        "contents": contents,
+        "system_instruction": {
+            "parts": [{"text": system_instruction}]
+        },
+        "generationConfig": {
+            "maxOutputTokens": 800,
+            "temperature": 0.7,
+        }
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as resp:
+            if resp.status != 200:
+                err_text = await resp.text()
+                logging.error("Gemini API error: %s", err_text)
+                return web.json_response({"error": "AI error"}, status=500)
+            
+            result = await resp.json()
+            try:
+                ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                return web.json_response({"reply": ai_text})
+            except (KeyError, IndexError):
+                return web.json_response({"error": "Malformed AI response"}, status=500)
 
 
 async def safe_reminder_loop(app: web.Application) -> None:
@@ -99,6 +218,9 @@ async def safe_reminder_loop(app: web.Application) -> None:
 
 async def on_startup(app: web.Application) -> None:
     logging.info("Application startup...")
+
+    # Load Knowledge Base into memory once
+    await load_kb(app)
 
     bot: Bot = app["bot"]
     admins_repo: AdminsRepo = app["admins_repo"]
@@ -143,6 +265,7 @@ def create_app() -> web.Application:
     users_repo = UsersRepo(db)
     candidates_repo = CandidatesRepo(db)
     admins_repo = AdminsRepo(db)
+    exam_configs_repo = ExamConfigsRepo(db)
     translations = load_translations()
 
     bot = build_bot()
@@ -150,6 +273,7 @@ def create_app() -> web.Application:
         admins_repo=admins_repo,
         users_repo=users_repo,
         candidates_repo=candidates_repo,
+        exam_configs_repo=exam_configs_repo,
         translations=translations,
     )
 
@@ -157,6 +281,7 @@ def create_app() -> web.Application:
 
     app.router.add_get("/", healthcheck)
     app.router.add_get("/health", healthcheck)
+    app.router.add_post("/api/ai_chat", handle_ai_chat)
 
     webhook_path = f"/webhook/{settings.WEBHOOK_SECRET}"
 
@@ -165,9 +290,17 @@ def create_app() -> web.Application:
     app["users_repo"] = users_repo
     app["candidates_repo"] = candidates_repo
     app["admins_repo"] = admins_repo
+    app["exam_configs_repo"] = exam_configs_repo
     app["translations"] = translations
     app["webhook_path"] = webhook_path
     app["reminder_task"] = None
+
+    webapp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "webapp")
+    if os.path.exists(webapp_dir):
+        app.router.add_static("/webapp/", path=webapp_dir, name="webapp")
+        logging.info("Serving WebApp from %s at /webapp/", webapp_dir)
+    else:
+        logging.warning("WebApp directory not found at %s", webapp_dir)
 
     SimpleRequestHandler(
         dispatcher=dp,

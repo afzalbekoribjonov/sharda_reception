@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: sharda-registration
+    env: docker
+    plan: free # or your preferred plan
+    region: frankfurt # or your preferred region
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB
+        value: suuz_bot
+      - key: BOT_TOKEN
+        sync: false
+      - key: SUPER_ADMIN_TG_ID
+        sync: false
+      - key: TZ
+        value: Asia/Tashkent
+      - key: WEBHOOK_BASE_URL
+        sync: false
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      - key: WEBAPP_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: INTRO_PHOTO_FILE_ID
+        sync: false
+    healthCheckPath: /health
+    disk:
+      name: exports-data
+      mountPath: /app/tmp_exports
+      sizeGB: 1
