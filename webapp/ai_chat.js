@@ -4,6 +4,7 @@
   const chatForm = document.getElementById("chatForm");
   const userInput = document.getElementById("userInput");
   const typing = document.getElementById("typing");
+  const scrollBtn = document.getElementById("scrollToBottom");
 
   if (tg) {
     tg.ready();
@@ -16,10 +17,42 @@
     localStorage.setItem("suuz_chat_history", JSON.stringify(history));
   }
 
+  // Scroll to bottom logic
+  chatBox.addEventListener("scroll", () => {
+    const threshold = 300;
+    const isScrolledUp = chatBox.scrollHeight - chatBox.clientHeight - chatBox.scrollTop > threshold;
+    scrollBtn.style.display = isScrolledUp ? "flex" : "none";
+  });
+
+  scrollBtn.addEventListener("click", () => {
+    chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
+  });
+
+  function formatMessage(text) {
+    // Escape HTML to prevent XSS
+    let escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+    // Bold: **text** -> <b>text</b>
+    escaped = escaped.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+
+    // Bullet points: * item or - item -> • item
+    escaped = escaped.replace(/^[\s]*[\*\-][\s]+(.*)$/gm, "• $1");
+
+    // Newlines: \n -> <br>
+    escaped = escaped.replace(/\n/g, "<br>");
+
+    return escaped;
+  }
+
   function addMessage(role, text) {
     const bubble = document.createElement("div");
     bubble.className = `bubble ${role}`;
-    bubble.textContent = text;
+    bubble.innerHTML = formatMessage(text);
     chatBox.appendChild(bubble);
     chatBox.scrollTop = chatBox.scrollHeight;
   }

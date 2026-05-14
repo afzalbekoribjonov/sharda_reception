@@ -96,8 +96,15 @@ async def handle_ai_chat(request: web.Request) -> web.Response:
     
     system_instruction = (
         "Siz Sharda University Uzbekistan (SUUZ) ning rasmiy virtual yordamchisi - 'Suuz agent'siz. "
-        "Sizning vazifangiz universitet haqidagi ma'lumotlar bazasi asosida aniq javob berish. "
-        "Suhbatni professional va juda xushmuomala tarzda olib boring. "
+        "Sizning vazifangiz universitet haqidagi ma'lumotlar bazasi asosida aniq va chiroyli formatlangan javob berish.\n\n"
+        "SUHBAT QOIDALARI:\n"
+        "1. Agar suhbat endi boshlangan bo'lsa (tarix bo'sh bo'lsa), xushmuomala salomlashing.\n"
+        "2. Agar suhbat davom etayotgan bo'lsa, har safar qayta salomlashmang ('Assalomu alaykum' deb takrorlamang), darhol savolga javob bering.\n"
+        "3. Suhbatni professional va juda xushmuomala tarzda olib boring.\n\n"
+        "FORMATLASH QOIDALARI:\n"
+        "1. Muhim ma'lumotlar va sarlavhalarni qalin (bold) yozing (masalan: **Bakalavriat**).\n"
+        "2. Ro'yxatlar uchun punktlardan foydalaning (* yoki -).\n"
+        "3. Har bir yangi bo'lim orasida bo'sh qator tashlang.\n\n"
         "Faqat taqdim etilgan ma'lumotlar asosida javob bering. Noma'lum ma'lumotlar uchun rasmiy saytni tavsiya qiling.\n\n"
         f"MA'LUMOTLAR BAZASI:\n{kb_content}"
     )
@@ -111,22 +118,40 @@ async def handle_ai_chat(request: web.Request) -> web.Response:
         if len(history) > 6:
             history = history[-6:]
 
-        # Create chat session with history (do NOT await)
-        async with async_client:
-            chat = async_client.chats.create(
-                model="gemini-3.1-flash-lite",
-                history=history,
-                config={
-                    "system_instruction": system_instruction,
-                    "max_output_tokens": 500,
-                    "temperature": 0.5,
-                }
-            )
-            
-            # Send user message and get response (AWAIT this)
-            response = await chat.send_message(user_message)
+        ai_text = ""
+        max_retries = 3
+        retry_delay = 1  # starting delay in seconds
+
+        for attempt in range(max_retries):
+            try:
+                # Create chat session with history (do NOT await)
+                async with async_client:
+                    chat = async_client.chats.create(
+                        model="gemini-3.1-flash-lite",
+                        history=history,
+                        config={
+                            "system_instruction": system_instruction,
+                            "max_output_tokens": 500,
+                            "temperature": 0.5,
+                        }
+                    )
+                    
+                    # Send user message and get response (AWAIT this)
+                    response = await chat.send_message(user_message)
+                
+                ai_text = response.text if hasattr(response, 'text') else str(response)
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                error_str = str(e).upper()
+                # Retry on 503 (Service Unavailable) or 500 (Internal Error)
+                if ("503" in error_str or "500" in error_str or "UNAVAILABLE" in error_str) and attempt < max_retries - 1:
+                    logging.warning("Gemini API spike (Attempt %d/%d). Retrying in %ds...", attempt + 1, max_retries, retry_delay)
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    raise e  # Permanent error or max retries reached
         
-        ai_text = response.text if hasattr(response, 'text') else str(response)
         return web.json_response({"reply": ai_text})
         
     except Exception as e:
@@ -271,7 +296,7 @@ def create_app() -> web.Application:
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format="%(asctime)s | %(levelname)s | %(message)s",
     )
 
