@@ -155,42 +155,6 @@ async def load_kb(app: web.Application) -> None:
         except Exception as e:
             logging.error("Error loading Knowledge Base: %s", e)
     app["kb_content"] = content
-    
-    contents = []
-    for h in history:
-        contents.append({
-            "role": "user" if h["role"] == "user" else "model",
-            "parts": [{"text": h["parts"][0]["text"]}]
-        })
-    contents.append({
-        "role": "user",
-        "parts": [{"text": user_message}]
-    })
-
-    payload = {
-        "contents": contents,
-        "system_instruction": {
-            "parts": [{"text": system_instruction}]
-        },
-        "generationConfig": {
-            "maxOutputTokens": 800,
-            "temperature": 0.7,
-        }
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload) as resp:
-            if resp.status != 200:
-                err_text = await resp.text()
-                logging.error("Gemini API error: %s", err_text)
-                return web.json_response({"error": "AI error"}, status=500)
-            
-            result = await resp.json()
-            try:
-                ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
-                return web.json_response({"reply": ai_text})
-            except (KeyError, IndexError):
-                return web.json_response({"error": "Malformed AI response"}, status=500)
 
 
 async def safe_reminder_loop(app: web.Application) -> None:
