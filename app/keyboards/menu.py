@@ -8,9 +8,9 @@ def main_menu_keyboard(t: dict[str, str]) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
 
     b.add(
-        InlineKeyboardButton(text=t["btn_menu_profile"], callback_data="m:profile"),
-        InlineKeyboardButton(text=t["btn_menu_exam"], callback_data="m:exam"),
-        InlineKeyboardButton(text=t["btn_menu_sharda"], callback_data="m:sharda"),
+        InlineKeyboardButton(text=t["btn_menu_profile"], callback_data="menu:PROFILE"),
+        InlineKeyboardButton(text=t["btn_menu_exam"], callback_data="menu:EXAM"),
+        InlineKeyboardButton(text=t["btn_menu_sharda"], callback_data="menu:SHARDA"),
     )
 
     # AI Chat button
@@ -19,7 +19,7 @@ def main_menu_keyboard(t: dict[str, str]) -> InlineKeyboardMarkup:
         b.add(InlineKeyboardButton(text=t["btn_menu_ai_chat"], web_app=WebAppInfo(url=ai_url)))
 
     b.add(
-        InlineKeyboardButton(text=t["btn_menu_settings"], callback_data="m:settings"),
+        InlineKeyboardButton(text=t["btn_menu_settings"], callback_data="menu:SETTINGS"),
     )
     b.adjust(2)
     return b.as_markup()

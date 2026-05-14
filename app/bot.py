@@ -13,6 +13,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+import google.genai as genai
 
 from app.config import settings
 from app.db.mongo import mongo
@@ -101,47 +102,37 @@ async def handle_ai_chat(request: web.Request) -> web.Response:
         f"MA'LUMOTLAR BAZASI:\n{kb_content}"
     )
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
-    
-    # Truncate history to last 6 messages (3 turns) to save tokens and stay within TPM limits
-    if len(history) > 6:
-        history = history[-6:]
+    try:
+        # Configure Google Genai SDK
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel(
+            model_name="gemini-3.1-flash-lite",
+            system_instruction=system_instruction
+        )
+        
+        # Truncate history to last 6 messages (3 turns) to save tokens and stay within TPM limits
+        if len(history) > 6:
+            history = history[-6:]
 
-    contents = []
-    for h in history:
-        contents.append({
-            "role": "user" if h["role"] == "user" else "model",
-            "parts": [{"text": h["parts"][0]["text"]}]
-        })
-    contents.append({
-        "role": "user",
-        "parts": [{"text": user_message}]
-    })
+        # Build chat history for the model
+        chat_history = []
+        for h in history:
+            role = "user" if h["role"] == "user" else "model"
+            text = h["parts"][0]["text"]
+            chat_history.append({"role": role, "parts": [{"text": text}]})
 
-    payload = {
-        "contents": contents,
-        "system_instruction": {
-            "parts": [{"text": system_instruction}]
-        },
-        "generationConfig": {
-            "maxOutputTokens": 500,
-            "temperature": 0.5,
-        }
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload) as resp:
-            if resp.status != 200:
-                err_text = await resp.text()
-                logging.error("Gemini API error (User: %s): %s", user_id, err_text)
-                return web.json_response({"error": "AI error"}, status=500)
-            
-            result = await resp.json()
-            try:
-                ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
-                return web.json_response({"reply": ai_text})
-            except (KeyError, IndexError):
-                return web.json_response({"error": "Malformed AI response"}, status=500)
+        # Start chat session with history
+        chat_session = model.start_chat(history=chat_history)
+        
+        # Send user message and get response
+        response = chat_session.send_message(user_message)
+        ai_text = response.text
+        
+        return web.json_response({"reply": ai_text})
+        
+    except Exception as e:
+        logging.error("Gemini API error (User: %s): %s", user_id, str(e))
+        return web.json_response({"error": "AI error"}, status=500)
 
 
 async def load_kb(app: web.Application) -> None:

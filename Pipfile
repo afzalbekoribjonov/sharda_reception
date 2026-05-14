@@ -12,6 +12,7 @@ pydantic-settings = "*"
 babel = "*"
 loguru = "*"
 openpyxl = "*"
+google-genai = "*"
 
 [dev-packages]
 ruff = "*"
